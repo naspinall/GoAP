@@ -1,4 +1,4 @@
-package packets
+package messages
 
 import (
 	"bytes"
@@ -15,6 +15,8 @@ const (
 	Acknowledgement uint8 = 2
 	Reset           uint8 = 3
 )
+
+type MessagesConfig func(*Message) error
 
 //Code Values
 const (
@@ -61,6 +63,20 @@ type Message struct {
 	Options     []Option
 	Payload     []byte
 	buff        *bytes.Buffer
+}
+
+// Create a new message with sane defaults
+func NewMessage(cfgs ...MessagesConfig) *Message {
+	m := &Message{
+		Version: 1,
+	}
+
+	for _, cfg := range cfgs {
+		if err := cfg(m); err != nil {
+			return nil
+		}
+	}
+	return m
 }
 
 type Option struct {
