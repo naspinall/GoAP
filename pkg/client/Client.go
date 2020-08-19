@@ -155,11 +155,12 @@ func (c *Client) generateMessageID() (uint16, error) {
 }
 
 func (c *Client) transmit(m *messages.Message) {
-	// Number of retranmist attemps
-	var retransmit int
-
-	// Message timout
-	timeout := AckTimeout * AckRandomFactor // TODO make this a random value.
+	var err error
+	if m.Type != messages.Confirmable {
+		// Write Message and finish
+		m.Write(c.conn)
+		return
+	}
 
 	// Getting MessageID and Token
 	messageID := m.MessageID
@@ -167,6 +168,12 @@ func (c *Client) transmit(m *messages.Message) {
 
 	// Getting Message Channel
 	messageChannel := c.messageChannels[messageID]
+
+	// Number of retranmist attemps
+	var retransmit int
+
+	// Message timout
+	timeout := AckTimeout * AckRandomFactor // TODO make this a random value.
 
 	// Keep retransmitting until MaxRetransmit
 	for retransmit <= MaxRetransmit {
@@ -179,12 +186,11 @@ func (c *Client) transmit(m *messages.Message) {
 		select {
 		case m := <-messageChannel.Message:
 
-			// Check message type
-			switch m.Type {
-			case messages.Acknowledgement:
-			case messages.Reset:
-
+			if m.Type != messages.Acknowledgement {
+				err = errors.New("Bad Response")
 			}
+			// Transmission Complete
+			return
 
 		case <-ticker.C:
 
@@ -194,10 +200,16 @@ func (c *Client) transmit(m *messages.Message) {
 			// Increase timeout
 			timeout *= 2
 		}
+
 	}
 
-	// Retransmit is done message has timed out.
-	messageChannel.Error <- errors.New("Timeout")
+	// No other errors indicates a timeout
+	if err != nil {
+		err = errors.New("Timeout")
+	}
+
+	// Send Timeout Message
+	messageChannel.Error <- err
 
 	// Removing message and token channels
 	delete(c.messageChannels, messageID)
@@ -235,19 +247,11 @@ func (c *Client) sendMessage() (*messages.Message, error) {
 
 	// Wait for a response from the server.
 	select {
-	case <-mc:
-		//ACK Recieved, now wait for response
-		break
 	case err := <-ec:
 		// Error Recieved, return error
 		return nil, err
 	case resp := <-tc:
-		// Piggybacked response
+		// Piggybacked or normal response
 		return resp, nil
 	}
-
-	// Wait for response
-	resp := <-tc
-
-	return resp, nil
 }
