@@ -61,8 +61,7 @@ func (c *Client) listen() {
 			log.Fatal(err)
 		}
 
-		token, _ := binary.Uvarint(m.Token)
-		c, ok := c.channels[token]
+		c, ok := c.channels[m.Token]
 		if !ok {
 			continue
 		}

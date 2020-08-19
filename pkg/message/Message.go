@@ -59,37 +59,16 @@ type Message struct {
 	TokenLength uint8 // 4 bit unsigned integer, length of the token.
 	Code        uint8 // Request type (GET,POST,PUT) or response type.
 	MessageID   uint16
-	Token       []byte
+	Token       uint64
 	Options     []Option
 	Payload     []byte
 	buff        *bytes.Buffer
-}
-
-// Create a new message with sane defaults
-func NewMessage(cfgs ...MessagesConfig) *Message {
-	m := &Message{
-		Version: 1,
-		buff:    &bytes.Buffer{},
-	}
-
-	for _, cfg := range cfgs {
-		if err := cfg(m); err != nil {
-			return nil
-		}
-	}
-	return m
 }
 
 type Option struct {
 	OptionNumber uint16 // Option type
 	Length       uint16 // Option length
 	Value        []byte // Option Value
-}
-
-func ToUint16(b []byte) uint16 {
-	value, _ := binary.Uvarint(b)
-	return uint16(value)
-
 }
 
 func (m *Message) SetNonConfirmable() *Message {
@@ -122,7 +101,7 @@ func (m *Message) EncodeHeader() error {
 
 func (m *Message) EncodeToken() error {
 	// Writing token to the buffer
-	_, err := m.buff.Write(m.Token)
+	err := binary.Write(m.buff, binary.LittleEndian, m.Token)
 	if err != nil {
 		return err
 	}
@@ -259,7 +238,8 @@ func (m *Message) DecodeToken() error {
 		return errors.New("Malformed Packet")
 	}
 
-	m.Token = b
+	// Reading the token
+	m.Token, _ = binary.Uvarint(b)
 	return nil
 }
 
@@ -279,7 +259,8 @@ func (m *Message) TwoByteOption() (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
-	return ToUint16(b) - 269, nil
+	option, _ := binary.Uvarint(b)
+	return uint16(option - 269), nil
 }
 
 func (m *Message) DecodeOptions() error {

@@ -1,5 +1,25 @@
 package messages
 
+import (
+	"bytes"
+	"encoding/binary"
+)
+
+// Create a new message with sane defaults
+func NewMessage(cfgs ...MessagesConfig) *Message {
+	m := &Message{
+		Version: 1,
+		buff:    &bytes.Buffer{},
+	}
+
+	for _, cfg := range cfgs {
+		if err := cfg(m); err != nil {
+			return nil
+		}
+	}
+	return m
+}
+
 func (m *Message) GET() *Message {
 	m.Code = GET
 	return m
@@ -22,7 +42,7 @@ func (m *Message) DELETE() *Message {
 
 func (m *Message) SetToken(b []byte) *Message {
 	m.TokenLength = uint8(len(b))
-	m.Token = b
+	m.Token, _ = binary.Uvarint(b)
 	return m
 }
 
