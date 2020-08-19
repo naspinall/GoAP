@@ -69,6 +69,7 @@ type Message struct {
 func NewMessage(cfgs ...MessagesConfig) *Message {
 	m := &Message{
 		Version: 1,
+		buff:    &bytes.Buffer{},
 	}
 
 	for _, cfg := range cfgs {
@@ -98,6 +99,7 @@ func (m *Message) SetNonConfirmable() *Message {
 
 // Encoding a message
 func (m *Message) EncodeHeader() error {
+
 	// Version, Type and Token Length Encoding
 	b := m.Version & 0x03
 	b = b | m.Type&0x03<<2
@@ -120,12 +122,11 @@ func (m *Message) EncodeHeader() error {
 
 func (m *Message) EncodeToken() error {
 	// Writing token to the buffer
-	n, err := m.buff.Write(m.Token)
+	_, err := m.buff.Write(m.Token)
 	if err != nil {
 		return err
 	}
 
-	m.TokenLength = uint8(n)
 	return nil
 }
 
@@ -372,19 +373,32 @@ func (m *Message) Decode() error {
 	if err := m.DecodePayload(); err != nil {
 		return err
 	}
+
+	// Won't be reading from the buffer anymore so reseting
+	m.buff.Reset()
 	return nil
 }
 
-func (m *Message) Read(r io.Reader) error {
+func FromReader(r io.Reader) (*Message, error) {
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	m.buff = bytes.NewBuffer(b)
-	return nil
+	// Creating new message with bytes as buffer.
+	m := &Message{buff: bytes.NewBuffer(b)}
+
+	// Decoding message
+	if err := m.Decode(); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
-func (m *Message) FromBytes(b []byte) error {
+func FromBytes(b []byte) (*Message, error) {
+	m := NewMessage()
 	m.buff = bytes.NewBuffer(b)
-	return nil
+	if err := m.Decode(); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
