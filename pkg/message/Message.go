@@ -8,12 +8,14 @@ import (
 	"io/ioutil"
 )
 
+type MessageType uint8
+
 // Type Values
 const (
-	Confirmable     uint8 = 0
-	NonConfirmable  uint8 = 1
-	Acknowledgement uint8 = 2
-	Reset           uint8 = 3
+	Confirmable     MessageType = 0
+	NonConfirmable  MessageType = 1
+	Acknowledgement MessageType = 2
+	Reset           MessageType = 3
 )
 
 type MessagesConfig func(*Message) error
@@ -54,10 +56,10 @@ const (
 )
 
 type Message struct {
-	Version     uint8 // CoAP Version Number
-	Type        uint8 // 2 bit unsigned integer, 0 Confirmable, 1 Non-Confirmable, 2 Acknowledgement (2), or Reset (3).
-	TokenLength uint8 // 4 bit unsigned integer, length of the token.
-	Code        uint8 // Request type (GET,POST,PUT) or response type.
+	Version     uint8       // CoAP Version Number
+	Type        MessageType // 2 bit unsigned integer, 0 Confirmable, 1 Non-Confirmable, 2 Acknowledgement (2), or Reset (3).
+	TokenLength uint8       // 4 bit unsigned integer, length of the token.
+	Code        uint8       // Request type (GET,POST,PUT) or response type.
 	MessageID   uint16
 	Token       uint64
 	Options     []Option
@@ -81,7 +83,7 @@ func (m *Message) EncodeHeader() error {
 
 	// Version, Type and Token Length Encoding
 	b := m.Version & 0x03
-	b = b | m.Type&0x03<<2
+	b = b | uint8(m.Type)&0x03<<2
 	b = b | m.TokenLength&0x0F<<4
 
 	// TODO work on this.
@@ -153,8 +155,12 @@ func (m *Message) EncodeOptions() error {
 
 func (m *Message) EncodePayload() error {
 
+	// Write Payload Marker if Options are present
+	if len(m.Options) != 0 {
+		m.buff.WriteByte(0xFF)
+	}
 	// Adding padding byte and writing to buffer
-	_, err := m.buff.Write(append([]byte{0xFF}, m.Payload...))
+	_, err := m.buff.Write(m.Payload)
 	if err != nil {
 		return err
 	}
@@ -210,7 +216,7 @@ func (m *Message) DecodeHeader() error {
 	}
 
 	m.Version = uint8(b[0] & 0x03)
-	m.Type = uint8(b[0] >> 2 & 0x03)
+	m.Type = MessageType(b[0] >> 2 & 0x03)
 	m.TokenLength = uint8(b[0] >> 4)
 
 	m.Code = b[1]

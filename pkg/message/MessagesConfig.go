@@ -40,9 +40,9 @@ func (m *Message) DELETE() *Message {
 	return m
 }
 
-func (m *Message) SetToken(b []byte) *Message {
-	m.TokenLength = uint8(len(b))
-	m.Token, _ = binary.Uvarint(b)
+func (m *Message) SetToken(token uint64) *Message {
+	m.TokenLength = uint8(binary.Size(token))
+	m.Token = token
 	return m
 }
 
@@ -56,9 +56,21 @@ func (m *Message) SetPayload(b []byte) *Message {
 	return m
 }
 
-func WithToken(b []byte) MessagesConfig {
+func (m *Message) SetType(Type MessageType) *Message {
+	m.Type = Type
+	return m
+}
+
+func WithType(Type MessageType) MessagesConfig {
 	return func(m *Message) error {
-		m.SetToken(b)
+		m.SetType(Type)
+		return nil
+	}
+}
+
+func WithToken(token uint64) MessagesConfig {
+	return func(m *Message) error {
+		m.SetToken(token)
 		return nil
 	}
 }
