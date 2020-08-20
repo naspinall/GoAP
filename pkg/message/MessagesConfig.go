@@ -5,6 +5,22 @@ import (
 	"encoding/binary"
 )
 
+func (m *Message) AsAcknowledge() *Message {
+
+	// Reusing memory, clearing values
+	m.Type = Acknowledgement
+	m.Code = Empty
+	m.TokenLength = 0
+	m.Token = 0
+	m.Options = nil
+	m.Payload = nil
+
+	// Reseting buffer
+	m.buff.Reset()
+
+	return m
+}
+
 // Create a new message with sane defaults
 func NewMessage(cfgs ...MessagesConfig) *Message {
 	m := &Message{

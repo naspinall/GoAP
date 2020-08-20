@@ -155,7 +155,7 @@ func (c *Client) generateMessageID() (uint16, error) {
 }
 
 func (c *Client) transmit(m *messages.Message) {
-	var err error
+
 	if m.Type != messages.Confirmable {
 		// Write Message and finish
 		m.Write(c.conn)
@@ -166,10 +166,10 @@ func (c *Client) transmit(m *messages.Message) {
 	messageID := m.MessageID
 	token := m.Token
 
-	// Getting Message Channel
-	messageChannel := c.messageChannels[messageID]
+	// Getting Message Channels
+	messageChannel, errorChannel := c.messageChannels[messageID].Message, c.messageChannels[messageID].Error
 
-	// Number of retranmist attemps
+	// Retransmit
 	var retransmit int
 
 	// Message timout
@@ -184,11 +184,17 @@ func (c *Client) transmit(m *messages.Message) {
 		ticker := time.NewTicker(time.Duration(timeout) * time.Second)
 
 		select {
-		case m := <-messageChannel.Message:
+		case m := <-messageChannel:
 
 			if m.Type != messages.Acknowledgement {
-				err = errors.New("Bad Response")
+				errorChannel <- errors.New("Bad Response")
+
+				// Removing message and token channels
+				delete(c.messageChannels, messageID)
+				delete(c.tokenChannels, token)
+				return
 			}
+
 			// Transmission Complete
 			return
 
@@ -203,13 +209,8 @@ func (c *Client) transmit(m *messages.Message) {
 
 	}
 
-	// No other errors indicates a timeout
-	if err != nil {
-		err = errors.New("Timeout")
-	}
-
 	// Send Timeout Message
-	messageChannel.Error <- err
+	errorChannel <- errors.New("Timeout")
 
 	// Removing message and token channels
 	delete(c.messageChannels, messageID)
@@ -254,4 +255,97 @@ func (c *Client) sendMessage() (*messages.Message, error) {
 		// Piggybacked or normal response
 		return resp, nil
 	}
+}
+
+func (c *Client) clearMessage(messageID uint16, token uint64) {
+	delete(c.messageChannels, messageID)
+	delete(c.tokenChannels, token)
+}
+
+func (c *Client) setupSession(messageID uint16, token uint64) {
+	// Creating Channels
+	tc, mc, ec := make(chan *messages.Message), make(chan *messages.Message), make(chan error)
+
+	// Adding Channels to client map
+	c.tokenChannels[token], c.messageChannels[messageID] = tc, &MessageChannel{
+		Error:   ec,
+		Message: mc,
+	}
+}
+
+func (c *Client) Get() {
+	m := messages.NewMessage(messages.Get(), messages.WithMessageID(10), messages.WithToken(10))
+	c.setupSession(10, 10)
+	_, err := c.transmitMessage(m)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (c *Client) transmitMessage(message *messages.Message) (*messages.Message, error) {
+	// Retransmit
+	var retransmit int
+
+	// Message timout
+	timeout := AckTimeout * AckRandomFactor // TODO make this a random value.
+	messageID, token := message.MessageID, message.Token
+
+	// Getting Message Channels
+	messageChannel := c.messageChannels[messageID].Message
+
+	// Keep retransmitting until MaxRetransmit
+	for retransmit <= MaxRetransmit {
+
+		// Sending Message
+		message.Write(c.conn)
+		log.Println("Message Sent")
+
+		ticker := time.NewTicker(time.Duration(timeout) * time.Second)
+
+		select {
+		case m := <-messageChannel:
+
+			if m.Type != messages.Acknowledgement {
+				c.clearMessage(messageID, token)
+			}
+
+			log.Println("Acknowledge Recieved")
+			// If a piggbacked response, send message to reciever
+			if m.Code != messages.Empty {
+				return m, nil
+			}
+
+			// Transmission Complete
+			return c.waitForResponse(token)
+
+		case <-ticker.C:
+
+			// Increase retransmit timmer
+			retransmit++
+
+			// Increase timeout
+			timeout *= 2
+		}
+
+	}
+
+	// Sending timeout error
+	c.clearMessage(messageID, token)
+	return nil, errors.New("Timout")
+}
+
+func (c *Client) waitForResponse(token uint64) (*messages.Message, error) {
+	tokenChannel := c.tokenChannels[token]
+
+	select {
+
+	// Waiting for response
+	case m := <-tokenChannel:
+		log.Println("Response Recieved")
+		return m, nil
+
+	}
+
+	return nil, errors.New("Response Timeout")
+
 }

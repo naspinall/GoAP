@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"log"
 )
 
 type MessageType uint8
@@ -62,12 +63,12 @@ type Message struct {
 	Code        uint8       // Request type (GET,POST,PUT) or response type.
 	MessageID   uint16
 	Token       uint64
-	Options     []Option
+	Options     Options
 	Payload     []byte
 	buff        *bytes.Buffer
 }
 
-type Option struct {
+type RawOption struct {
 	OptionNumber uint16 // Option type
 	Length       uint16 // Option length
 	Value        []byte // Option Value
@@ -102,12 +103,17 @@ func (m *Message) EncodeHeader() error {
 }
 
 func (m *Message) EncodeToken() error {
+
+	// Skipping if TokenLength is zero.
+	if m.TokenLength == 0 {
+		return nil
+	}
+
 	// Writing token to the buffer
 	err := binary.Write(m.buff, binary.LittleEndian, m.Token)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -182,6 +188,10 @@ func (m *Message) Encode() error {
 		return err
 	}
 	return nil
+}
+
+func (m *Message) Bytes() []byte {
+	return m.buff.Bytes()
 }
 
 func (m *Message) Write(w io.Writer) error {
@@ -320,12 +330,8 @@ func (m *Message) DecodeOptions() error {
 			return err
 		}
 
-		// Adding option
-		m.Options = append(m.Options, Option{
-			OptionNumber: delta + prevDelta,
-			Length:       length,
-			Value:        val,
-		})
+		// Setting Option
+		m.SetOption(delta+prevDelta, length, val)
 
 		prevDelta += delta
 		// Reading next header or payload indicator byte
@@ -354,9 +360,9 @@ func (m *Message) Decode() error {
 	if err := m.DecodeToken(); err != nil {
 		return err
 	}
-	if err := m.DecodeOptions(); err != nil {
-		return err
-	}
+	// if err := m.DecodeOptions(); err != nil {
+	// 	return err
+	// }
 	if err := m.DecodePayload(); err != nil {
 		return err
 	}
@@ -382,9 +388,11 @@ func FromReader(r io.Reader) (*Message, error) {
 }
 
 func FromBytes(b []byte) (*Message, error) {
-	m := NewMessage()
-	m.buff = bytes.NewBuffer(b)
+	m := &Message{
+		buff: bytes.NewBuffer(b),
+	}
 	if err := m.Decode(); err != nil {
+		log.Printf("%+v", m)
 		return nil, err
 	}
 	return m, nil
