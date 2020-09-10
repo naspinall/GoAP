@@ -12,7 +12,7 @@ func (m *Message) AsAcknowledge() *Message {
 	m.Code = Empty
 	m.TokenLength = 0
 	m.Token = 0
-	m.Options = nil
+	//m.Options = nil
 	m.Payload = nil
 
 	// Reseting buffer
