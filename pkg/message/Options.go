@@ -138,30 +138,30 @@ func EncodeSingleOption(delta uint, b []byte) ([]byte, error) {
 	var extendedOptions []byte
 
 	// Encoding Delta
-	if delta > 13 {
-		header = 0xD0
+	if delta >= 13 {
+		header = 0x0D
 		extendedDelta := byte(delta - 13)
-		extendedOptions = append(b, extendedDelta)
-	} else if delta > 269 {
-		header = 0xE0
+		extendedOptions = append(extendedOptions, extendedDelta)
+	} else if delta >= 269 {
+		header = 0x0E
 		extendedDelta := uint16(delta - 269)
-		extendedOptions = append(b, byte(extendedDelta), byte(extendedDelta>>8))
+		extendedOptions = append(extendedOptions, byte(extendedDelta), byte(extendedDelta>>8))
 	} else {
 		header = byte(delta)
 	}
 
 	length := uint(len(b))
 	// Encoding Length
-	if length > 13 {
-		header = header & 0xFD
+	if length >= 13 {
+		header = 0xD0 ^ header
 		extendedLength := byte(length - 13)
-		extendedOptions = append(b, extendedLength)
-	} else if length > 269 {
-		header = header & 0xFE
+		extendedOptions = append(extendedOptions, extendedLength)
+	} else if length >= 269 {
+		header = 0xE0 ^ header
 		extendedLength := uint16(length - 269)
-		extendedOptions = append(b, byte(extendedLength), byte(extendedLength>>8))
+		extendedOptions = append(extendedOptions, byte(extendedLength), byte(extendedLength>>8))
 	} else {
-		header = byte(length >> 4)
+		header = byte(header ^ byte(length<<4))
 	}
 
 	// Adding header to start of slice with extended options or lengths
