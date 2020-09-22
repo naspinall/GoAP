@@ -1,6 +1,10 @@
 package messages
 
 import (
+	"net/url"
+	"strconv"
+	"strings"
+
 	"github.com/naspinall/GoAP/pkg/coding"
 )
 
@@ -44,6 +48,40 @@ type Options struct {
 	IfMatch       [][]byte
 	IfNoneMatch   bool
 	Size1         *uint
+}
+
+func (o *Options) SetURI(rawurl string) error {
+	parsedURL, err := url.Parse(rawurl)
+	if err != nil {
+		return err
+	}
+
+	parsedPort := parsedURL.Port()
+	if parsedPort == "" {
+		parsedPort = "5683"
+	}
+
+	// Getting port
+	portInt, err := strconv.Atoi(parsedPort)
+	if err != nil {
+		return err
+	}
+
+	port := uint(portInt)
+	o.URIPort = &port
+
+	// Getting Host
+	host := parsedURL.Hostname()
+	o.URIHost = &host
+
+	// Getting and splitting path
+	path := strings.Split(parsedURL.Path, "/")
+	for index, pathElement := range path {
+		path[index] = strings.TrimSpace(pathElement)
+	}
+	o.URIPath = path[1:len(path)]
+
+	return nil
 }
 
 func (o *Options) DecodeOption(number uint, b []byte) error {

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"log"
+	"math/big"
 	"net"
 	"time"
 
@@ -154,114 +155,6 @@ func (c *Client) generateMessageID() (uint16, error) {
 	return messageID, nil
 }
 
-func (c *Client) transmit(m *messages.Message) {
-
-	if m.Type != messages.Confirmable {
-		// Write Message and finish
-		m.Write(c.conn)
-		return
-	}
-
-	// Getting MessageID and Token
-	messageID := m.MessageID
-	token := m.Token
-
-	// Getting Message Channels
-	messageChannel, errorChannel := c.messageChannels[messageID].Message, c.messageChannels[messageID].Error
-
-	// Retransmit
-	var retransmit int
-
-	// Message timout
-	timeout := AckTimeout * AckRandomFactor // TODO make this a random value.
-
-	// Keep retransmitting until MaxRetransmit
-	for retransmit <= MaxRetransmit {
-
-		// Sending Message
-		m.Write(c.conn)
-
-		ticker := time.NewTicker(time.Duration(timeout) * time.Second)
-
-		select {
-		case m := <-messageChannel:
-
-			if m.Type != messages.Acknowledgement {
-				errorChannel <- errors.New("Bad Response")
-
-				// Removing message and token channels
-				delete(c.messageChannels, messageID)
-				delete(c.tokenChannels, token)
-				return
-			}
-
-			// Transmission Complete
-			return
-
-		case <-ticker.C:
-
-			// Increase retransmit timmer
-			retransmit++
-
-			// Increase timeout
-			timeout *= 2
-		}
-
-	}
-
-	// Send Timeout Message
-	errorChannel <- errors.New("Timeout")
-
-	// Removing message and token channels
-	delete(c.messageChannels, messageID)
-	delete(c.tokenChannels, token)
-}
-
-func (c *Client) sendMessage() (*messages.Message, error) {
-
-	// Generating Token
-	token, err := c.generateToken()
-	if err != nil {
-		return nil, err
-	}
-
-	// Generating MessageID
-	messageID, err := c.generateMessageID()
-	if err != nil {
-		return nil, err
-	}
-
-	// Creating Channels
-	tc, mc, ec := make(chan *messages.Message), make(chan *messages.Message), make(chan error)
-
-	// Adding Channels to client map
-	c.tokenChannels[token], c.messageChannels[messageID] = tc, &MessageChannel{
-		Error:   ec,
-		Message: mc,
-	}
-
-	// Creating Message
-	m := messages.NewMessage(messages.Get(), messages.WithToken(token), messages.WithMessageID(messageID))
-
-	// Transmit the message to the server
-	go c.transmit(m)
-
-	// Wait for a response from the server.
-	select {
-	case err := <-ec:
-		// Error Recieved, return error
-		return nil, err
-	case resp := <-tc:
-		// Piggybacked or normal response
-		return resp, nil
-	}
-}
-
-func (c *Client) clearMessage(messageID uint16, token uint64) {
-	delete(c.messageChannels, messageID)
-	delete(c.tokenChannels, token)
-}
-
 func (c *Client) setupSession(messageID uint16, token uint64) {
 	// Creating Channels
 	tc, mc, ec := make(chan *messages.Message), make(chan *messages.Message), make(chan error)
@@ -273,16 +166,38 @@ func (c *Client) setupSession(messageID uint16, token uint64) {
 	}
 }
 
-func (c *Client) Get() {
-	m := messages.NewMessage(messages.Get(), messages.WithMessageID(10), messages.WithToken(10))
-	c.setupSession(10, 10)
-	_, err := c.transmitMessage(m)
-	if err != nil {
-		log.Fatal(err)
-	}
+func (c *Client) teardownSession(messageID uint16, token uint64) {
+	delete(c.messageChannels, messageID)
+	delete(c.tokenChannels, token)
 }
 
-func (c *Client) transmitMessage(message *messages.Message) (*messages.Message, error) {
+func (c *Client) randomIDs() (messageID uint16, token uint64, err error) {
+	randomID, err := rand.Int(rand.Reader, big.NewInt(0xFFFF))
+	if err != nil {
+		return 0, 0, err
+	}
+	messageID = uint16(randomID.Uint64())
+
+	// Checking messageID not in use
+	if _, ok := c.messageChannels[messageID]; ok {
+		return c.randomIDs()
+	}
+
+	randomID, err = rand.Int(rand.Reader, big.NewInt(0xFFFFFFFFFFFFFFF))
+	if err != nil {
+		return 0, 0, err
+	}
+	token = randomID.Uint64()
+
+	// Checking token not in use
+	if _, ok := c.tokenChannels[token]; ok {
+		return c.randomIDs()
+	}
+
+	return
+}
+
+func (c *Client) Do(message *messages.Message) (*messages.Message, error) {
 	// Retransmit
 	var retransmit int
 
@@ -306,12 +221,13 @@ func (c *Client) transmitMessage(message *messages.Message) (*messages.Message, 
 		case m := <-messageChannel:
 
 			if m.Type != messages.Acknowledgement {
-				c.clearMessage(messageID, token)
+				c.teardownSession(messageID, token)
 			}
 
 			log.Println("Acknowledge Recieved")
 			// If a piggbacked response, send message to reciever
 			if m.Code != messages.Empty {
+				c.teardownSession(messageID, token)
 				return m, nil
 			}
 
@@ -330,7 +246,7 @@ func (c *Client) transmitMessage(message *messages.Message) (*messages.Message, 
 	}
 
 	// Sending timeout error
-	c.clearMessage(messageID, token)
+	c.teardownSession(messageID, token)
 	return nil, errors.New("Timout")
 }
 
