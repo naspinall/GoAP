@@ -25,6 +25,7 @@ func NewMessage(cfgs ...MessagesConfig) *Message {
 	m := &Message{
 		Version: 1,
 		buff:    &bytes.Buffer{},
+		Options: &Options{},
 	}
 
 	for _, cfg := range cfgs {
