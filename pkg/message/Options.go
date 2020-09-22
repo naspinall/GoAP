@@ -33,21 +33,21 @@ const (
 // string  UTF8 string
 
 type Options struct {
-	ContentFormat *uint
+	ContentFormat uint
 	ETag          [][]byte
 	LocationPath  []string
 	LocationQuery []string
-	MaxAge        *uint
+	MaxAge        uint
 	ProxyURI      *string
 	ProxyScheme   *string
 	URIHost       *string
 	URIPath       []string
-	URIPort       *uint
+	URIPort       uint
 	URIQuery      []string
-	Accept        *uint
+	Accept        uint
 	IfMatch       [][]byte
 	IfNoneMatch   bool
-	Size1         *uint
+	Size1         uint
 }
 
 func (o *Options) SetURI(rawurl string) error {
@@ -67,8 +67,7 @@ func (o *Options) SetURI(rawurl string) error {
 		return err
 	}
 
-	port := uint(portInt)
-	o.URIPort = &port
+	o.URIPort = uint(portInt)
 
 	// Getting Host
 	host := parsedURL.Hostname()
@@ -105,8 +104,7 @@ func (o *Options) DecodeOption(number uint, b []byte) error {
 
 	// URI-Port
 	case URIPort:
-		port := coding.DecodeUint(b)
-		o.URIPort = &port
+		o.URIPort = coding.DecodeUint(b)
 
 	// Location Path
 	case LocationPath:
@@ -118,20 +116,17 @@ func (o *Options) DecodeOption(number uint, b []byte) error {
 
 	// Content Format
 	case ContentFormat:
-		contentFormat := coding.DecodeUint(b)
-		o.ContentFormat = &contentFormat
+		o.ContentFormat = coding.DecodeUint(b)
 	//Max-Age
 	case MaxAge:
-		maxAge := coding.DecodeUint(b)
-		o.MaxAge = &maxAge
+		o.MaxAge = coding.DecodeUint(b)
 
 	// URI-Query
 	case URIQuery:
 		o.URIQuery = append(o.URIQuery, string(b))
 	// Accept
 	case Accept:
-		accept := coding.DecodeUint(b)
-		o.Accept = &accept
+		o.Accept = coding.DecodeUint(b)
 
 	// Location Query
 	case LocationQuery:
@@ -149,8 +144,7 @@ func (o *Options) DecodeOption(number uint, b []byte) error {
 
 	// Size1
 	case Size1:
-		sizeOne := coding.DecodeUint(b)
-		o.Size1 = &sizeOne
+		o.Size1 = coding.DecodeUint(b)
 	}
 	return nil
 }
@@ -194,17 +188,18 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 	var total []byte
 	var previousValue uint = 0
 
-	if o.ContentFormat != nil {
+	{
 		delta := ContentFormat - previousValue
 		previousValue = ContentFormat
 
-		value := coding.EncodeUint(*o.ContentFormat)
+		value := coding.EncodeUint(o.ContentFormat)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err
 		}
 
 		total = append(total, b...)
+
 	}
 
 	if o.ETag != nil {
@@ -257,11 +252,11 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 
 	}
 
-	if o.MaxAge != nil {
+	{
 		delta := MaxAge - previousValue
 		previousValue = MaxAge
 
-		value := coding.EncodeUint(*o.MaxAge)
+		value := coding.EncodeUint(o.MaxAge)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err
@@ -323,11 +318,11 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 		}
 	}
 
-	if o.URIPort != nil {
+	{
 		delta := URIPort - previousValue
 		previousValue = URIPort
 
-		value := coding.EncodeUint(*o.URIPort)
+		value := coding.EncodeUint(o.URIPort)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err
@@ -352,11 +347,11 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 		}
 	}
 
-	if o.Accept != nil {
+	{
 		delta := Accept - previousValue
 		previousValue = Accept
 
-		value := coding.EncodeUint(*o.Accept)
+		value := coding.EncodeUint(o.Accept)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err
@@ -397,11 +392,11 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 
 	}
 
-	if o.Size1 != nil {
+	{
 		delta := Size1 - previousValue
 		previousValue = Size1
 
-		value := coding.EncodeUint(*o.URIPort)
+		value := coding.EncodeUint(o.URIPort)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err

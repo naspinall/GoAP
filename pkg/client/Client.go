@@ -205,6 +205,9 @@ func (c *Client) Do(message *messages.Message) (*messages.Message, error) {
 	timeout := AckTimeout * AckRandomFactor // TODO make this a random value.
 	messageID, token := message.MessageID, message.Token
 
+	// Setting up CoAP message session
+	c.setupSession(messageID, token)
+
 	// Getting Message Channels
 	messageChannel := c.messageChannels[messageID].Message
 

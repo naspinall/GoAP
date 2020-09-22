@@ -56,6 +56,14 @@ const (
 	ServiceUnavailable    uint8 = 163
 	GatewayTimeout        uint8 = 164
 	ProxyingNotSupported  uint8 = 165
+
+	//Media Types
+	TextPlain   = 0
+	LinkFormat  = 40
+	XML         = 41
+	OctetStream = 42
+	EXI         = 47
+	JSON        = 50
 )
 
 type Message struct {

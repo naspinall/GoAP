@@ -2,6 +2,7 @@ package messages
 
 import (
 	"bytes"
+	"errors"
 )
 
 func (m *Message) AsAcknowledge() *Message {
@@ -72,6 +73,35 @@ func (m *Message) SetPayload(b []byte) *Message {
 func (m *Message) SetType(Type MessageType) *Message {
 	m.Type = Type
 	return m
+}
+
+func WithContentType(contentType string) MessagesConfig {
+	return func(m *Message) error {
+
+		if contentType == "text/plain" {
+			m.Options.ContentFormat = TextPlain
+		} else if contentType == "application/link-format" {
+			m.Options.ContentFormat = LinkFormat
+		} else if contentType == "application/xml" {
+			m.Options.ContentFormat = XML
+		} else if contentType == "application/octet-stream" {
+			m.Options.ContentFormat = OctetStream
+		} else if contentType == "application/exi" {
+			m.Options.ContentFormat = EXI
+		} else if contentType == "application/json" {
+			m.Options.ContentFormat = JSON
+		} else {
+			return errors.New("Bad Content Format Provided")
+		}
+		return nil
+	}
+
+}
+
+func WithURI(URI string) MessagesConfig {
+	return func(m *Message) error {
+		return m.Options.SetURI(URI)
+	}
 }
 
 func WithType(Type MessageType) MessagesConfig {
