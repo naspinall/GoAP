@@ -88,7 +88,7 @@ func (m *Message) EncodeHeader() error {
 	}
 
 	// Encoding message id
-	err = binary.Write(m.buff, binary.LittleEndian, m.MessageID)
+	m.buff.Write(Uint16ToBytes(m.MessageID))
 	if err != nil {
 		return err
 	}
@@ -104,61 +104,20 @@ func (m *Message) EncodeToken() error {
 	}
 
 	// Writing token to the buffer
-	err := binary.Write(m.buff, binary.LittleEndian, m.Token)
+	b := UintToBytes(uint(m.Token))
+	_, err := m.buff.Write(b)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// func (m *Message) EncodeOptions() error {
-// 	var currentDelta uint16
-
-// 	// Worry about extended options later
-// 	for _, option := range m.Options {
-// 		delta := option.OptionNumber - currentDelta
-// 		if delta > 13 {
-// 			b := uint8(delta - 13)
-// 			err := m.buff.WriteByte(b)
-// 			if err != nil {
-// 				return err
-// 			}
-// 			delta = 13
-// 		} else if delta > 269 {
-// 			b := delta - 269
-// 			_, err := m.buff.Write([]byte{byte(b >> 8), byte(0x00FF & b)})
-// 			if err != nil {
-// 				return err
-// 			}
-// 			delta = 14
-// 		}
-// 		// Encoding Option header
-// 		header := uint8(delta) | uint8(option.Length&0x0F<<4)
-// 		err := m.buff.WriteByte(header)
-// 		if err != nil {
-// 			return err
-// 		}
-
-// 		n, err := m.buff.Write(option.Value)
-// 		// Checking option length
-// 		if uint16(n) != option.Length {
-// 			return errors.New("Bad Option Length")
-// 		}
-
-// 		if err != nil {
-// 			return err
-// 		}
-
-// 	}
-// 	return nil
-// }
-
 func (m *Message) EncodePayload() error {
 
 	// Write Payload Marker if Options are present
-	// if len(m.Options) != 0 {
-	// 	m.buff.WriteByte(0xFF)
-	// }
+	if m.Options != nil {
+		m.buff.WriteByte(0xFF)
+	}
 	// Adding padding byte and writing to buffer
 	_, err := m.buff.Write(m.Payload)
 	if err != nil {
@@ -175,9 +134,14 @@ func (m *Message) Encode() error {
 	if err := m.EncodeToken(); err != nil {
 		return err
 	}
-	// if err := m.EncodeOptions(); err != nil {
-	// 	return err
-	// }
+
+	b, err := m.Options.EncodeOptions()
+	if err != nil {
+		return err
+	}
+
+	m.buff.Write(b)
+
 	if err := m.EncodePayload(); err != nil {
 		return err
 	}
@@ -225,7 +189,7 @@ func (m *Message) DecodeHeader() error {
 
 	m.Code = b[1]
 
-	messageID, n := binary.Uvarint(b[2:])
+	messageID := ParseUint16(b[2:])
 	m.MessageID = uint16(messageID)
 
 	return nil
@@ -249,7 +213,7 @@ func (m *Message) DecodeToken() error {
 	}
 
 	// Reading the token
-	m.Token, _ = binary.Uvarint(b)
+	m.Token = ParseUint64(b)
 	return nil
 }
 
@@ -275,6 +239,9 @@ func (m *Message) TwoByteOption() (uint16, error) {
 
 func (m *Message) DecodeOptions() error {
 	var prevDelta uint16
+
+	// Creating Options
+	options := &Options{}
 
 	// Holds the option header
 	b, err := m.buff.ReadByte()
@@ -325,7 +292,10 @@ func (m *Message) DecodeOptions() error {
 		}
 
 		// Setting Option
-		//m.SetOption(delta+prevDelta, length, val)
+		err = options.DecodeOption(uint(delta+prevDelta), val)
+		if err != nil {
+			return err
+		}
 
 		prevDelta += delta
 		// Reading next header or payload indicator byte
@@ -335,6 +305,7 @@ func (m *Message) DecodeOptions() error {
 		}
 	}
 
+	m.Options = options
 	return nil
 }
 
@@ -390,4 +361,20 @@ func FromBytes(b []byte) (*Message, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+func ParseUint64(b []byte) (value uint64) {
+
+	for index, currentByte := range b {
+		value |= uint64(currentByte) << (8 * index)
+	}
+	return
+}
+
+func ParseUint16(b []byte) (value uint16) {
+
+	for index, currentByte := range b {
+		value |= uint16(currentByte) << (8 * index)
+	}
+	return
 }

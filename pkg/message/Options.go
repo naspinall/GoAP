@@ -166,7 +166,6 @@ func EncodeSingleOption(delta uint, b []byte) ([]byte, error) {
 
 	// Adding header to start of slice with extended options or lengths
 	return append(append([]byte{header}, extendedOptions...), b...), nil
-
 }
 
 func (o *Options) EncodeOptions() ([]byte, error) {
@@ -399,6 +398,26 @@ func ParseUint(value []byte) (uint, error) {
 		return 0, errors.New("Bad Option Provided")
 	}
 	return uint(val), nil
+}
+
+func Uint16ToBytes(value uint16) (b []byte) {
+	b = append(b, byte(value))
+	b = append(b, byte(value<<8))
+	b = append(b, byte(value<<16))
+	b = append(b, byte(value<<24))
+	return
+}
+
+func Uint64ToBytes(value uint64) (b []byte) {
+	b = append(b, byte(value))
+	b = append(b, byte(value<<8))
+	b = append(b, byte(value<<16))
+	b = append(b, byte(value<<24))
+	b = append(b, byte(value<<32))
+	b = append(b, byte(value<<40))
+	b = append(b, byte(value<<48))
+	b = append(b, byte(value<<56))
+	return
 }
 
 // Return minimum number of bytes for uint
