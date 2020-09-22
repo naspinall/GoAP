@@ -1,8 +1,7 @@
 package messages
 
 import (
-	"encoding/binary"
-	"errors"
+	"github.com/naspinall/GoAP/pkg/coding"
 )
 
 const (
@@ -68,10 +67,7 @@ func (o *Options) DecodeOption(number uint, b []byte) error {
 
 	// URI-Port
 	case URIPort:
-		port, err := ParseUint(b)
-		if err != nil {
-			return err
-		}
+		port := coding.DecodeUint(b)
 		o.URIPort = &port
 
 	// Location Path
@@ -84,17 +80,11 @@ func (o *Options) DecodeOption(number uint, b []byte) error {
 
 	// Content Format
 	case ContentFormat:
-		contentFormat, err := ParseUint(b)
-		if err != nil {
-			return err
-		}
+		contentFormat := coding.DecodeUint(b)
 		o.ContentFormat = &contentFormat
 	//Max-Age
 	case MaxAge:
-		maxAge, err := ParseUint(b)
-		if err != nil {
-			return err
-		}
+		maxAge := coding.DecodeUint(b)
 		o.MaxAge = &maxAge
 
 	// URI-Query
@@ -102,10 +92,7 @@ func (o *Options) DecodeOption(number uint, b []byte) error {
 		o.URIQuery = append(o.URIQuery, string(b))
 	// Accept
 	case Accept:
-		accept, err := ParseUint(b)
-		if err != nil {
-			return err
-		}
+		accept := coding.DecodeUint(b)
 		o.Accept = &accept
 
 	// Location Query
@@ -124,10 +111,7 @@ func (o *Options) DecodeOption(number uint, b []byte) error {
 
 	// Size1
 	case Size1:
-		sizeOne, err := ParseUint(b)
-		if err != nil {
-			return err
-		}
+		sizeOne := coding.DecodeUint(b)
 		o.Size1 = &sizeOne
 	}
 	return nil
@@ -176,7 +160,7 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 		delta := ContentFormat - previousValue
 		previousValue = ContentFormat
 
-		value := UintToBytes(*o.ContentFormat)
+		value := coding.EncodeUint(*o.ContentFormat)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err
@@ -239,7 +223,7 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 		delta := MaxAge - previousValue
 		previousValue = MaxAge
 
-		value := UintToBytes(*o.MaxAge)
+		value := coding.EncodeUint(*o.MaxAge)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err
@@ -305,7 +289,7 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 		delta := URIPort - previousValue
 		previousValue = URIPort
 
-		value := UintToBytes(*o.URIPort)
+		value := coding.EncodeUint(*o.URIPort)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err
@@ -334,7 +318,7 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 		delta := Accept - previousValue
 		previousValue = Accept
 
-		value := UintToBytes(*o.Accept)
+		value := coding.EncodeUint(*o.Accept)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err
@@ -379,7 +363,7 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 		delta := Size1 - previousValue
 		previousValue = Size1
 
-		value := UintToBytes(*o.URIPort)
+		value := coding.EncodeUint(*o.URIPort)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err
@@ -390,70 +374,4 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 	}
 
 	return total, nil
-}
-
-func ParseUint(value []byte) (uint, error) {
-	val, n := binary.Uvarint(value)
-	if n < 0 {
-		return 0, errors.New("Bad Option Provided")
-	}
-	return uint(val), nil
-}
-
-func Uint16ToBytes(value uint16) (b []byte) {
-	b = append(b, byte(value))
-	b = append(b, byte(value<<8))
-	b = append(b, byte(value<<16))
-	b = append(b, byte(value<<24))
-	return
-}
-
-func Uint64ToBytes(value uint64) (b []byte) {
-	b = append(b, byte(value))
-	b = append(b, byte(value<<8))
-	b = append(b, byte(value<<16))
-	b = append(b, byte(value<<24))
-	b = append(b, byte(value<<32))
-	b = append(b, byte(value<<40))
-	b = append(b, byte(value<<48))
-	b = append(b, byte(value<<56))
-	return
-}
-
-// Return minimum number of bytes for uint
-func UintToBytes(value uint) (b []byte) {
-
-	if value > 0xFF {
-		b = append(b, byte(value))
-	}
-	if value > 0xFFFF {
-		b = append(b, byte(value>>56))
-	}
-	if value > 0xFFFF {
-		b = append(b, byte(value>>48))
-	}
-	if value > 0xFFFFFF {
-		b = append(b, byte(value>>40))
-	}
-	if value > 0xFFFFFFFF {
-		b = append(b, byte(value>>32))
-	}
-	if value > 0xFFFFFFFFFF {
-		b = append(b, byte(value>>24))
-	}
-	if value > 0xFFFFFFFFFFFF {
-		b = append(b, byte(value>>16))
-	}
-	if value > 0xFFFFFFFFFFFFFF {
-		b = append(b, byte(value>>8))
-	}
-
-	for i, valueByte := range b {
-		if valueByte != 0x00 {
-			return b[i:]
-		} else if i == len(b)-1 {
-			return b[i:]
-		}
-	}
-	return nil
 }

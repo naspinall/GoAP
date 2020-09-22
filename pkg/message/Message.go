@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+
+	"github.com/naspinall/GoAP/pkg/coding"
 )
 
 type MessageType uint8
@@ -76,10 +78,12 @@ func (m *Message) SetNonConfirmable() *Message {
 // Encoding a message
 func (m *Message) EncodeHeader() error {
 
+	token := coding.EncodeUint(uint(m.Token))
+
 	// Version, Type and Token Length Encoding
 	b := m.Version & 0x03
 	b = b | uint8(m.Type)&0x03<<2
-	b = b | m.TokenLength&0x0F<<4
+	b = b | byte(len(token))&0x0F<<4
 
 	// TODO work on this.
 	_, err := m.buff.Write([]byte{b, m.Code})
@@ -88,27 +92,17 @@ func (m *Message) EncodeHeader() error {
 	}
 
 	// Encoding message id
-	m.buff.Write(Uint16ToBytes(m.MessageID))
+	m.buff.Write(coding.EncodeUint16(m.MessageID))
 	if err != nil {
 		return err
 	}
 
-	return nil
-}
-
-func (m *Message) EncodeToken() error {
-
-	// Skipping if TokenLength is zero.
-	if m.TokenLength == 0 {
-		return nil
-	}
-
-	// Writing token to the buffer
-	b := UintToBytes(uint(m.Token))
-	_, err := m.buff.Write(b)
+	// Encoding Token
+	m.buff.Write(token)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -129,9 +123,6 @@ func (m *Message) EncodePayload() error {
 
 func (m *Message) Encode() error {
 	if err := m.EncodeHeader(); err != nil {
-		return err
-	}
-	if err := m.EncodeToken(); err != nil {
 		return err
 	}
 
