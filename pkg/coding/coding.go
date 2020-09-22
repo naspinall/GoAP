@@ -30,49 +30,40 @@ func EncodeUint(value uint) []byte {
 }
 
 func DecodeUint16(input []byte) (value uint16) {
-	count := 0
-	for _, b := range input {
-		if count > 1 {
+	for index, b := range input {
+		if index > 1 {
 			return
 		}
 
 		// Adding Byte
-		value |= uint16(b) << (8 * count)
+		value |= uint16(b) << (8 * index)
 
-		// Incrementing counter
-		count++
 	}
 	return
 }
 
 func DecodeUint32(input []byte) (value uint32) {
-	count := 0
-	for _, b := range input {
-		if count > 3 {
+	for index, b := range input {
+		if index > 3 {
 			return
 		}
 
 		// Adding Byte
-		value |= uint32(b) << (8 * count)
+		value |= uint32(b) << (8 * index)
 
-		// Incrementing counter
-		count++
 	}
 	return
 }
 
 func DecodeUint64(input []byte) (value uint64) {
-	count := 0
-	for _, b := range input {
-		if count > 7 {
+	for index, b := range input {
+		if index > 7 {
 			return
 		}
 
 		// Adding Byte
-		value |= uint64(b) << (8 * count)
+		value |= uint64(b) << (8 * index)
 
-		// Incrementing counter
-		count++
 	}
 	return
 }

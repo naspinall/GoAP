@@ -27,67 +27,46 @@ func TestMessage_DecodeHeader(t *testing.T) {
 		wantTokenLength uint8
 		wantCode        uint8
 		wantMessageID   uint16
+		wantToken       uint64
 	}{
 		{
 			name: "Version and Type, No Header",
 			fields: fields{
-				buff: bytes.NewBuffer([]byte{0xF5, 0x11, 0x11, 0x11}),
+				buff: bytes.NewBuffer([]byte{0xF5, 0x11, 0x11, 0x11, 0x01}),
 			},
 			wantErr:         false,
 			wantVersion:     0x1,
 			wantType:        0x1,
-			wantTokenLength: 0xF,
+			wantTokenLength: 0x1,
 			wantCode:        0x11,
 			wantMessageID:   0x1111,
+			wantToken:       0x01,
 		},
 		{
 			name: "Version and Type, No Header",
 			fields: fields{
-				buff: bytes.NewBuffer([]byte{0xA6, 0x11, 0x22, 0x22}),
+				buff: bytes.NewBuffer([]byte{0xA6, 0x11, 0x22, 0x22, 0x01, 0x01}),
 			},
 			wantErr:         false,
 			wantVersion:     0x2,
 			wantType:        0x1,
-			wantTokenLength: 0xA,
+			wantTokenLength: 0x2,
 			wantCode:        0x11,
 			wantMessageID:   0x2222,
-		},
-		{
-			name: "Version and Type, No Header",
-			fields: fields{
-				buff: bytes.NewBuffer([]byte{0xC9, 0x11, 0x22, 0x11}),
-			},
-			wantErr:         false,
-			wantVersion:     0x1,
-			wantType:        0x2,
-			wantTokenLength: 0xC,
-			wantCode:        0x22,
-			wantMessageID:   0x1111,
-		},
-		{
-			name: "Empty Buffer",
-			fields: fields{
-				buff: &bytes.Buffer{},
-			},
-			wantErr:         true,
-			wantVersion:     0x0,
-			wantType:        0x0,
-			wantTokenLength: 0x0,
-			wantCode:        0x0,
-			wantMessageID:   0x0,
+			wantToken:       0x0101,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Message{
-				Version:     tt.fields.Version,
-				Type:        MessageType(tt.fields.Type),
-				TokenLength: tt.fields.TokenLength,
-				Code:        tt.fields.Code,
-				MessageID:   tt.fields.MessageID,
-				Options:     tt.fields.Options,
-				Payload:     tt.fields.Payload,
-				buff:        tt.fields.buff,
+				Version: tt.fields.Version,
+				Type:    MessageType(tt.fields.Type),
+
+				Code:      tt.fields.Code,
+				MessageID: tt.fields.MessageID,
+				Options:   tt.fields.Options,
+				Payload:   tt.fields.Payload,
+				buff:      tt.fields.buff,
 			}
 			if err := m.DecodeHeader(); (err != nil) != tt.wantErr {
 				t.Errorf("Message.DecodeHeader() error = %v, wantErr %v", err, tt.wantErr)
@@ -101,77 +80,6 @@ func TestMessage_DecodeHeader(t *testing.T) {
 				t.Errorf("Message.DecodeHeader() type = %v, wantType %v", m.Type, tt.wantType)
 			}
 
-			if m.TokenLength != tt.wantTokenLength {
-				t.Errorf("Message.DecodeHeader() tokenlength = %v, wantTokenLength %v", m.TokenLength, tt.wantTokenLength)
-			}
-
-		})
-	}
-}
-
-func TestMessage_DecodeToken(t *testing.T) {
-	type fields struct {
-		Version     uint8
-		Type        MessageType
-		TokenLength uint8
-		Code        uint8
-		MessageID   uint16
-		Token       uint64
-		Options     *Options
-		Payload     []byte
-		buff        *bytes.Buffer
-	}
-	tests := []struct {
-		name      string
-		fields    fields
-		wantErr   bool
-		wantToken uint64
-	}{
-		{
-			name: "No Token",
-			fields: fields{
-				TokenLength: 0,
-			},
-			wantErr: false,
-		},
-		{
-			name: "Valid Token",
-			fields: fields{
-				TokenLength: 2,
-				buff:        bytes.NewBuffer([]byte{0x01, 0x01}),
-			},
-			wantToken: 0x0101,
-		},
-		{
-			name: "Invalid Token Length",
-			fields: fields{
-				TokenLength: 3,
-				buff:        bytes.NewBuffer([]byte{0x01, 0x01}),
-			},
-			wantToken: 0,
-			wantErr:   true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &Message{
-				Version:     tt.fields.Version,
-				Type:        MessageType(tt.fields.Type),
-				TokenLength: tt.fields.TokenLength,
-				Code:        tt.fields.Code,
-				MessageID:   tt.fields.MessageID,
-				Token:       tt.fields.Token,
-				Options:     tt.fields.Options,
-				Payload:     tt.fields.Payload,
-				buff:        tt.fields.buff,
-			}
-			if err := m.DecodeToken(); (err != nil) != tt.wantErr {
-				t.Errorf("Message.DecodeToken() error = %v, wantErr %v", err, tt.wantErr)
-			}
-
-			if m.Token != tt.wantToken {
-				t.Errorf("Message.DecodeToken() Token = %v, wantToken %v", m.Token, tt.wantToken)
-			}
 		})
 	}
 }
@@ -281,7 +189,7 @@ func TestMessage_DecodeToken(t *testing.T) {
 // 			m := &Message{
 // 				Version:     tt.fields.Version,
 // Type:        MessageType(tt.fields.Type),
-// 				TokenLength: tt.fields.TokenLength,
+//
 // 				Code:        tt.fields.Code,
 // 				MessageID:   tt.fields.MessageID,
 // 				Token:       tt.fields.Token,
@@ -342,15 +250,15 @@ func TestMessage_DecodePayload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Message{
-				Version:     tt.fields.Version,
-				Type:        MessageType(tt.fields.Type),
-				TokenLength: tt.fields.TokenLength,
-				Code:        tt.fields.Code,
-				MessageID:   tt.fields.MessageID,
-				Token:       tt.fields.Token,
-				Options:     tt.fields.Options,
-				Payload:     tt.fields.Payload,
-				buff:        tt.fields.buff,
+				Version: tt.fields.Version,
+				Type:    MessageType(tt.fields.Type),
+
+				Code:      tt.fields.Code,
+				MessageID: tt.fields.MessageID,
+				Token:     tt.fields.Token,
+				Options:   tt.fields.Options,
+				Payload:   tt.fields.Payload,
+				buff:      tt.fields.buff,
 			}
 			if err := m.DecodePayload(); (err != nil) != tt.wantErr {
 				t.Errorf("Message.DecodePayload() error = %v, wantErr %v", err, tt.wantErr)
@@ -400,15 +308,15 @@ func TestMessage_EncodePayload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Message{
-				Version:     tt.fields.Version,
-				Type:        MessageType(tt.fields.Type),
-				TokenLength: tt.fields.TokenLength,
-				Code:        tt.fields.Code,
-				MessageID:   tt.fields.MessageID,
-				Token:       tt.fields.Token,
-				Options:     tt.fields.Options,
-				Payload:     tt.fields.Payload,
-				buff:        tt.fields.buff,
+				Version: tt.fields.Version,
+				Type:    MessageType(tt.fields.Type),
+
+				Code:      tt.fields.Code,
+				MessageID: tt.fields.MessageID,
+				Token:     tt.fields.Token,
+				Options:   tt.fields.Options,
+				Payload:   tt.fields.Payload,
+				buff:      tt.fields.buff,
 			}
 			if err := m.EncodePayload(); (err != nil) != tt.wantErr {
 				t.Errorf("Message.EncodePayload() error = %v, wantErr %v", err, tt.wantErr)
@@ -420,69 +328,6 @@ func TestMessage_EncodePayload(t *testing.T) {
 		})
 	}
 }
-
-func TestMessage_EncodeToken(t *testing.T) {
-	type fields struct {
-		Version     uint8
-		Type        MessageType
-		TokenLength uint8
-		Code        uint8
-		MessageID   uint16
-		Token       uint64
-		Options     *Options
-		Payload     []byte
-		buff        *bytes.Buffer
-	}
-	tests := []struct {
-		name            string
-		fields          fields
-		wantErr         bool
-		wantToken       uint64
-		wantTokenLength uint8
-	}{
-		{
-			name: "No Token",
-			fields: fields{
-				buff: &bytes.Buffer{},
-			},
-		},
-		{
-			name: "A Token",
-			fields: fields{
-				buff:        &bytes.Buffer{},
-				Token:       0xFFFFFF,
-				TokenLength: 3,
-			},
-			wantToken:       0xFFFFFF,
-			wantTokenLength: 3,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &Message{
-				Version:     tt.fields.Version,
-				Type:        MessageType(tt.fields.Type),
-				TokenLength: tt.fields.TokenLength,
-				Code:        tt.fields.Code,
-				MessageID:   tt.fields.MessageID,
-				Token:       tt.fields.Token,
-				Options:     tt.fields.Options,
-				Payload:     tt.fields.Payload,
-				buff:        tt.fields.buff,
-			}
-			if err := m.EncodeToken(); (err != nil) != tt.wantErr {
-				t.Errorf("Message.EncodeToken() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if m.Token != tt.wantToken {
-				t.Errorf("Message.EncodeToken() Token = %v, wantToken %v", m.Token, tt.wantToken)
-			}
-			if tt.wantTokenLength != m.TokenLength {
-				t.Errorf("Message.EncodeToken() TokenLength = %v, wantTokenLength %v", m.TokenLength, tt.wantTokenLength)
-			}
-		})
-	}
-}
-
 func TestMessage_EncodeHeader(t *testing.T) {
 	type fields struct {
 		Version     uint8
@@ -510,8 +355,9 @@ func TestMessage_EncodeHeader(t *testing.T) {
 				TokenLength: 1,
 				Code:        1,
 				MessageID:   1,
+				Token:       1,
 			},
-			wantHeader: []byte{0x15, 0x01, 0x01, 0x00},
+			wantHeader: []byte{0x15, 0x01, 0x01, 0x00, 0x01},
 		},
 		{
 			name: "Header Value",
@@ -523,21 +369,21 @@ func TestMessage_EncodeHeader(t *testing.T) {
 				Code:        8,
 				MessageID:   12,
 			},
-			wantHeader: []byte{0x5E, 0x08, 0x0C, 0x00},
+			wantHeader: []byte{0x5E, 0x08, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Message{
-				Version:     tt.fields.Version,
-				Type:        MessageType(tt.fields.Type),
-				TokenLength: tt.fields.TokenLength,
-				Code:        tt.fields.Code,
-				MessageID:   tt.fields.MessageID,
-				Token:       tt.fields.Token,
-				Options:     tt.fields.Options,
-				Payload:     tt.fields.Payload,
-				buff:        tt.fields.buff,
+				Version: tt.fields.Version,
+				Type:    MessageType(tt.fields.Type),
+
+				Code:      tt.fields.Code,
+				MessageID: tt.fields.MessageID,
+				Token:     tt.fields.Token,
+				Options:   tt.fields.Options,
+				Payload:   tt.fields.Payload,
+				buff:      tt.fields.buff,
 			}
 			if err := m.EncodeHeader(); (err != nil) != tt.wantErr {
 				t.Errorf("Message.EncodeHeader() error = %v, wantErr %v", err, tt.wantErr)
@@ -583,15 +429,15 @@ func TestMessage_Encode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Message{
-				Version:     tt.fields.Version,
-				Type:        MessageType(tt.fields.Type),
-				TokenLength: tt.fields.TokenLength,
-				Code:        tt.fields.Code,
-				MessageID:   tt.fields.MessageID,
-				Token:       tt.fields.Token,
-				Options:     tt.fields.Options,
-				Payload:     tt.fields.Payload,
-				buff:        tt.fields.buff,
+				Version: tt.fields.Version,
+				Type:    MessageType(tt.fields.Type),
+
+				Code:      tt.fields.Code,
+				MessageID: tt.fields.MessageID,
+				Token:     tt.fields.Token,
+				Options:   tt.fields.Options,
+				Payload:   tt.fields.Payload,
+				buff:      tt.fields.buff,
 			}
 			if err := m.Encode(); (err != nil) != tt.wantErr {
 				t.Errorf("Message.Encode() error = %v, wantErr %v", err, tt.wantErr)
@@ -610,9 +456,7 @@ func TestMessage_Encode(t *testing.T) {
 			if !reflect.DeepEqual(m.Type, tt.fields.Type) {
 				t.Errorf("Message.Decode() Type = %v, wantType = %v", m.Type, tt.fields.Type)
 			}
-			if !reflect.DeepEqual(m.TokenLength, tt.fields.TokenLength) {
-				t.Errorf("Message.Decode() TokenLength = %v, wantTokenLength = %v", m.TokenLength, tt.fields.TokenLength)
-			}
+
 			if !reflect.DeepEqual(m.Code, tt.fields.Code) {
 				t.Errorf("Message.Decode() Code = %v, wantCode = %v", m.Code, tt.fields.Code)
 			}

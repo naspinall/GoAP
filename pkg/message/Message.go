@@ -59,15 +59,14 @@ const (
 )
 
 type Message struct {
-	Version     uint8       // CoAP Version Number
-	Type        MessageType // 2 bit unsigned integer, 0 Confirmable, 1 Non-Confirmable, 2 Acknowledgement (2), or Reset (3).
-	TokenLength uint8       // 4 bit unsigned integer, length of the token.
-	Code        uint8       // Request type (GET,POST,PUT) or response type.
-	MessageID   uint16
-	Token       uint64
-	Options     *Options
-	Payload     []byte
-	buff        *bytes.Buffer
+	Version   uint8       // CoAP Version Number
+	Type      MessageType // 2 bit unsigned integer, 0 Confirmable, 1 Non-Confirmable, 2 Acknowledgement (2), or Reset (3).
+	Code      uint8       // Request type (GET,POST,PUT) or response type.
+	MessageID uint16
+	Token     uint64
+	Options   *Options
+	Payload   []byte
+	buff      *bytes.Buffer
 }
 
 func (m *Message) SetNonConfirmable() *Message {
@@ -97,10 +96,12 @@ func (m *Message) EncodeHeader() error {
 		return err
 	}
 
-	// Encoding Token
-	m.buff.Write(token)
-	if err != nil {
-		return err
+	// Only encode token if required
+	if len(token) > 0 {
+		m.buff.Write(token)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -176,36 +177,23 @@ func (m *Message) DecodeHeader() error {
 
 	m.Version = uint8(b[0] & 0x03)
 	m.Type = MessageType(b[0] >> 2 & 0x03)
-	m.TokenLength = uint8(b[0] >> 4)
+	tokenLength := uint8(b[0] >> 4)
 
 	m.Code = b[1]
 
-	messageID := ParseUint16(b[2:])
+	messageID := coding.DecodeUint16(b[2:])
 	m.MessageID = uint16(messageID)
 
-	return nil
-
-}
-
-func (m *Message) DecodeToken() error {
-	// If no token just skip
-	if m.TokenLength == 0 {
-		return nil
-	}
-
-	b := make([]byte, m.TokenLength)
-	n, err := m.buff.Read(b)
+	b = make([]byte, tokenLength)
+	n, err = m.buff.Read(b)
 	if err != nil {
 		return err
 	}
 
-	if uint8(n) != m.TokenLength {
-		return errors.New("Malformed Packet")
-	}
-
 	// Reading the token
-	m.Token = ParseUint64(b)
+	m.Token = coding.DecodeUint64(b)
 	return nil
+
 }
 
 func (m *Message) OneByteOption() (uint16, error) {
@@ -313,12 +301,9 @@ func (m *Message) Decode() error {
 	if err := m.DecodeHeader(); err != nil {
 		return err
 	}
-	if err := m.DecodeToken(); err != nil {
+	if err := m.DecodeOptions(); err != nil {
 		return err
 	}
-	// if err := m.DecodeOptions(); err != nil {
-	// 	return err
-	// }
 	if err := m.DecodePayload(); err != nil {
 		return err
 	}
@@ -352,20 +337,4 @@ func FromBytes(b []byte) (*Message, error) {
 		return nil, err
 	}
 	return m, nil
-}
-
-func ParseUint64(b []byte) (value uint64) {
-
-	for index, currentByte := range b {
-		value |= uint64(currentByte) << (8 * index)
-	}
-	return
-}
-
-func ParseUint16(b []byte) (value uint16) {
-
-	for index, currentByte := range b {
-		value |= uint16(currentByte) << (8 * index)
-	}
-	return
 }

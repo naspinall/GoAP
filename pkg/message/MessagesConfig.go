@@ -2,7 +2,6 @@ package messages
 
 import (
 	"bytes"
-	"encoding/binary"
 )
 
 func (m *Message) AsAcknowledge() *Message {
@@ -10,7 +9,6 @@ func (m *Message) AsAcknowledge() *Message {
 	// Reusing memory, clearing values
 	m.Type = Acknowledgement
 	m.Code = Empty
-	m.TokenLength = 0
 	m.Token = 0
 	//m.Options = nil
 	m.Payload = nil
@@ -57,7 +55,6 @@ func (m *Message) DELETE() *Message {
 }
 
 func (m *Message) SetToken(token uint64) *Message {
-	m.TokenLength = uint8(binary.Size(token))
 	m.Token = token
 	return m
 }
