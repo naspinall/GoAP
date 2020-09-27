@@ -154,30 +154,31 @@ func EncodeSingleOption(delta uint, b []byte) ([]byte, error) {
 	var extendedOptions []byte
 
 	// Encoding Delta
-	if delta >= 13 {
-		header = 0x0D
-		extendedDelta := byte(delta - 13)
-		extendedOptions = append(extendedOptions, extendedDelta)
-	} else if delta >= 269 {
-		header = 0x0E
+	if delta >= 269 {
+		header = 0xE0
 		extendedDelta := uint16(delta - 269)
-		extendedOptions = append(extendedOptions, byte(extendedDelta), byte(extendedDelta>>8))
+		extendedOptions = append(extendedOptions, coding.EncodeUint16(uint16(extendedDelta))[1])
+	} else if delta >= 13 {
+		header = 0xD0
+		extendedDelta := uint16(delta - 13)
+		extendedOptions = append(extendedOptions, coding.EncodeUint16(uint16(extendedDelta))[1])
 	} else {
-		header = byte(delta)
+		header = coding.EncodeUint16(uint16(delta))[1] << 4
 	}
 
 	length := uint(len(b))
+
 	// Encoding Length
-	if length >= 13 {
-		header = 0xD0 ^ header
-		extendedLength := byte(length - 13)
-		extendedOptions = append(extendedOptions, extendedLength)
-	} else if length >= 269 {
+	if length >= 269 {
 		header = 0xE0 ^ header
 		extendedLength := uint16(length - 269)
-		extendedOptions = append(extendedOptions, byte(extendedLength), byte(extendedLength>>8))
+		extendedOptions = append(extendedOptions, coding.EncodeUint16(uint16(extendedLength))[1])
+	} else if length >= 13 {
+		header = 0x0D ^ header
+		extendedLength := byte(length - 13)
+		extendedOptions = append(extendedOptions, coding.EncodeUint16(uint16(extendedLength))[1])
 	} else {
-		header = byte(header ^ byte(length<<4))
+		header |= coding.EncodeUint16(uint16(length))[1]
 	}
 
 	// Adding header to start of slice with extended options or lengths
@@ -188,12 +189,27 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 	var total []byte
 	var previousValue uint = 0
 
-	{
-		delta := ContentFormat - previousValue
-		previousValue = ContentFormat
+	if o.IfMatch != nil {
+		delta := IfMatch - previousValue
+		previousValue = IfMatch
 
-		value := coding.EncodeUint(o.ContentFormat)
-		b, err := EncodeSingleOption(delta, value)
+		for _, match := range o.IfMatch {
+
+			b, err := EncodeSingleOption(delta, match)
+			if err != nil {
+				return nil, err
+			}
+			total = append(total, b...)
+			// If there are more than one eTag then delta is zero.
+			delta = 0
+		}
+	}
+
+	if o.URIHost != nil {
+		delta := uint(URIHost) - previousValue
+		previousValue = URIHost
+
+		b, err := EncodeSingleOption(delta, []byte(*o.URIHost))
 		if err != nil {
 			return nil, err
 		}
@@ -219,6 +235,33 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 
 	}
 
+	if o.IfNoneMatch {
+		delta := IfNoneMatch - previousValue
+		previousValue = IfNoneMatch
+
+		b, err := EncodeSingleOption(delta, []byte{})
+		if err != nil {
+			return nil, err
+		}
+		total = append(total, b...)
+		// If there are more than one eTag then delta is zero.
+		delta = 0
+
+	}
+
+	{
+		delta := URIPort - previousValue
+		previousValue = URIPort
+
+		value := coding.EncodeUint(o.URIPort)
+		b, err := EncodeSingleOption(delta, value)
+		if err != nil {
+			return nil, err
+		}
+
+		total = append(total, b...)
+	}
+
 	if o.LocationPath != nil {
 		delta := LocationPath - previousValue
 		previousValue = LocationPath
@@ -233,73 +276,6 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 			// If there are more than one eTag then delta is zero.
 			delta = 0
 		}
-	}
-
-	if o.LocationQuery != nil {
-		delta := LocationQuery - previousValue
-		previousValue = LocationQuery
-
-		for _, query := range o.LocationQuery {
-
-			b, err := EncodeSingleOption(delta, []byte(query))
-			if err != nil {
-				return nil, err
-			}
-			total = append(total, b...)
-			// If there are more than one eTag then delta is zero.
-			delta = 0
-		}
-
-	}
-
-	{
-		delta := MaxAge - previousValue
-		previousValue = MaxAge
-
-		value := coding.EncodeUint(o.MaxAge)
-		b, err := EncodeSingleOption(delta, value)
-		if err != nil {
-			return nil, err
-		}
-
-		total = append(total, b...)
-	}
-
-	if o.ProxyURI != nil {
-		delta := ProxyURI - previousValue
-		previousValue = ProxyURI
-
-		b, err := EncodeSingleOption(delta, []byte(*o.ProxyURI))
-		if err != nil {
-			return nil, err
-		}
-
-		total = append(total, b...)
-	}
-
-	if o.ProxyScheme != nil {
-		delta := ProxyScheme - previousValue
-		previousValue = ProxyScheme
-
-		b, err := EncodeSingleOption(delta, []byte(*o.ProxyScheme))
-		if err != nil {
-			return nil, err
-		}
-
-		total = append(total, b...)
-	}
-
-	if o.URIHost != nil {
-		delta := URIHost - previousValue
-		previousValue = URIHost
-
-		b, err := EncodeSingleOption(delta, []byte(*o.URIHost))
-		if err != nil {
-			return nil, err
-		}
-
-		total = append(total, b...)
-
 	}
 
 	if o.URIPath != nil {
@@ -319,10 +295,24 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 	}
 
 	{
-		delta := URIPort - previousValue
-		previousValue = URIPort
+		delta := ContentFormat - previousValue
+		previousValue = ContentFormat
 
-		value := coding.EncodeUint(o.URIPort)
+		value := coding.EncodeUint(o.ContentFormat)
+		b, err := EncodeSingleOption(delta, value)
+		if err != nil {
+			return nil, err
+		}
+
+		total = append(total, b...)
+
+	}
+
+	{
+		delta := MaxAge - previousValue
+		previousValue = MaxAge
+
+		value := coding.EncodeUint(o.MaxAge)
 		b, err := EncodeSingleOption(delta, value)
 		if err != nil {
 			return nil, err
@@ -361,13 +351,13 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 
 	}
 
-	if o.IfMatch != nil {
-		delta := IfMatch - previousValue
-		previousValue = IfMatch
+	if o.LocationQuery != nil {
+		delta := LocationQuery - previousValue
+		previousValue = LocationQuery
 
-		for _, match := range o.IfMatch {
+		for _, query := range o.LocationQuery {
 
-			b, err := EncodeSingleOption(delta, match)
+			b, err := EncodeSingleOption(delta, []byte(query))
 			if err != nil {
 				return nil, err
 			}
@@ -378,18 +368,28 @@ func (o *Options) EncodeOptions() ([]byte, error) {
 
 	}
 
-	if o.IfNoneMatch {
-		delta := IfNoneMatch - previousValue
-		previousValue = IfNoneMatch
+	if o.ProxyURI != nil {
+		delta := ProxyURI - previousValue
+		previousValue = ProxyURI
 
-		b, err := EncodeSingleOption(delta, []byte{})
+		b, err := EncodeSingleOption(delta, []byte(*o.ProxyURI))
 		if err != nil {
 			return nil, err
 		}
-		total = append(total, b...)
-		// If there are more than one eTag then delta is zero.
-		delta = 0
 
+		total = append(total, b...)
+	}
+
+	if o.ProxyScheme != nil {
+		delta := ProxyScheme - previousValue
+		previousValue = ProxyScheme
+
+		b, err := EncodeSingleOption(delta, []byte(*o.ProxyScheme))
+		if err != nil {
+			return nil, err
+		}
+
+		total = append(total, b...)
 	}
 
 	{

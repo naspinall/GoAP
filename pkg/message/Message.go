@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -86,30 +87,19 @@ func (m *Message) SetNonConfirmable() *Message {
 func (m *Message) EncodeHeader() error {
 
 	token := coding.EncodeUint(uint(m.Token))
-
+	fmt.Println(byte(0x0F & len(token)))
 	// Version, Type and Token Length Encoding
-	b := m.Version & 0x03
-	b = b | uint8(m.Type)&0x03<<2
-	b = b | byte(len(token))&0x0F<<4
+	b := (m.Version << 6) | (byte(m.Type)&0x03)<<4 | byte(0x0F&len(token))
 
-	// TODO work on this.
-	_, err := m.buff.Write([]byte{b, m.Code})
-	if err != nil {
-		return err
-	}
+	// Adding header byte
+	binary.Write(m.buff, binary.BigEndian, []byte{b, m.Code})
 
 	// Encoding message id
 	m.buff.Write(coding.EncodeUint16(m.MessageID))
-	if err != nil {
-		return err
-	}
 
 	// Only encode token if required
 	if len(token) > 0 {
-		m.buff.Write(token)
-		if err != nil {
-			return err
-		}
+		binary.Write(m.buff, binary.BigEndian, token)
 	}
 
 	return nil
@@ -139,13 +129,16 @@ func (m *Message) Encode() error {
 	if err != nil {
 		return err
 	}
+	fmt.Println(b)
 
 	m.buff.Write(b)
 
 	if err := m.EncodePayload(); err != nil {
 		return err
 	}
+
 	return nil
+
 }
 
 func (m *Message) Bytes() []byte {

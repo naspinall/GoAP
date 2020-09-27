@@ -7,12 +7,12 @@ import (
 )
 
 func main() {
-	c, err := client.NewClient("coap.me", 5683)
+	c, err := client.NewClient("localhost", 5688)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	m, err := c.Get("coap://coap.me/test")
+	m, err := c.Get("coap://localhost/a")
 	if err != nil {
 		log.Fatal(err)
 	}

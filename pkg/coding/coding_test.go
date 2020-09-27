@@ -19,14 +19,14 @@ func TestEncodeUint16(t *testing.T) {
 			args: args{
 				value: 0x0002,
 			},
-			want: []byte{0x02, 0x00},
+			want: []byte{0x00, 0x02},
 		},
 		{
 			name: "Encoding 0x2002",
 			args: args{
 				value: 0x2002,
 			},
-			want: []byte{0x02, 0x20},
+			want: []byte{0x20, 0x02},
 		},
 		{
 			name: "Encoding 0x0202",
@@ -40,7 +40,7 @@ func TestEncodeUint16(t *testing.T) {
 			args: args{
 				value: 0x2000,
 			},
-			want: []byte{0x00, 0x20},
+			want: []byte{0x20, 0x00},
 		},
 	}
 	for _, tt := range tests {
@@ -369,6 +369,50 @@ func TestDecodeUint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := DecodeUint(tt.args.input); got != tt.want {
 				t.Errorf("DecodeUint() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestZeroPad(t *testing.T) {
+	type args struct {
+		input  []byte
+		length int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []byte
+	}{
+		{
+			name: "Base Case",
+			args: args{
+				input:  []byte{1, 2, 3, 4},
+				length: 0,
+			},
+			want: []byte{1, 2, 3, 4},
+		},
+		{
+			name: "6 -> 8",
+			args: args{
+				input:  []byte{1, 2, 3, 4, 5, 6},
+				length: 8,
+			},
+			want: []byte{1, 2, 3, 4, 5, 6, 0, 0},
+		},
+		{
+			name: "4 -> 8",
+			args: args{
+				input:  []byte{1, 2, 3, 4},
+				length: 8,
+			},
+			want: []byte{1, 2, 3, 4, 0, 0, 0, 0},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ZeroPad(tt.args.input, tt.args.length); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ZeroPad() = %v, want %v", got, tt.want)
 			}
 		})
 	}

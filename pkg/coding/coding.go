@@ -1,73 +1,65 @@
 package coding
 
-func EncodeUint16(value uint16) []byte {
-	return []byte{byte(value), byte(value >> 8)}
+import (
+	"encoding/binary"
+)
+
+func EncodeUint16(value uint16) (b []byte) {
+	b = make([]byte, 2)
+	binary.BigEndian.PutUint16(b, value)
+	return
 }
-func EncodeUint32(value uint32) []byte {
-	return []byte{byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24)}
+func EncodeUint32(value uint32) (b []byte) {
+	b = make([]byte, 4)
+	binary.BigEndian.PutUint32(b, value)
+	return
 }
-func EncodeUint64(value uint64) []byte {
-	return []byte{byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24), byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56)}
+func EncodeUint64(value uint64) (b []byte) {
+	b = make([]byte, 8)
+	binary.BigEndian.PutUint64(b, value)
+	return
 }
-func EncodeUint(value uint) []byte {
-	if value > 0xFFFFFFFFFFFFFF {
-		return []byte{byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24), byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56)}
-	} else if value > 0xFFFFFFFFFFFF {
-		return []byte{byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24), byte(value >> 32), byte(value >> 40), byte(value >> 48)}
-	} else if value > 0xFFFFFFFFFF {
-		return []byte{byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24), byte(value >> 32), byte(value >> 40)}
-	} else if value > 0xFFFFFFFF {
-		return []byte{byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24), byte(value >> 32)}
-	} else if value > 0xFFFFFF {
-		return []byte{byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24)}
-	} else if value > 0xFFFF {
-		return []byte{byte(value), byte(value >> 8), byte(value >> 16)}
-	} else if value > 0xFF {
-		return []byte{byte(value), byte(value >> 8)}
+func EncodeUint(value uint) (b []byte) {
+	b = make([]byte, 8)
+	binary.BigEndian.PutUint64(b, uint64(value))
+
+	// Removing zero padding
+	for index, val := range b {
+		if val != 0 {
+			b = b[index:]
+			return
+		}
 	}
 
-	return []byte{byte(value)}
+	return
 }
 
 func DecodeUint16(input []byte) (value uint16) {
-	for index, b := range input {
-		if index > 1 {
-			return
-		}
-
-		// Adding Byte
-		value |= uint16(b) << (8 * index)
-
-	}
-	return
+	input = ZeroPad(input, 2)
+	return binary.BigEndian.Uint16(input)
 }
 
 func DecodeUint32(input []byte) (value uint32) {
-	for index, b := range input {
-		if index > 3 {
-			return
-		}
-
-		// Adding Byte
-		value |= uint32(b) << (8 * index)
-
-	}
-	return
+	input = ZeroPad(input, 4)
+	return binary.BigEndian.Uint32(input)
 }
 
 func DecodeUint64(input []byte) (value uint64) {
-	for index, b := range input {
-		if index > 7 {
-			return
-		}
-
-		// Adding Byte
-		value |= uint64(b) << (8 * index)
-
-	}
-	return
+	input = ZeroPad(input, 8)
+	return binary.BigEndian.Uint64(input)
 }
 
 func DecodeUint(input []byte) (value uint) {
+
 	return uint(DecodeUint64(input))
+}
+
+func ZeroPad(input []byte, length int) []byte {
+	diff := length - len(input)
+
+	for i := 0; i < diff; i++ {
+		input = append(input, 0)
+	}
+
+	return input
 }
