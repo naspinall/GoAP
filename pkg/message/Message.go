@@ -176,14 +176,13 @@ func (m *Message) DecodeHeader() error {
 		return errors.New("Malformed Packet")
 	}
 
-	m.Version = uint8(b[0] & 0x03)
-	m.Type = MessageType(b[0] >> 2 & 0x03)
-	tokenLength := uint8(b[0] >> 4)
+	m.Version = uint8(b[0] >> 6 & 0x03)
+	m.Type = MessageType(b[0] >> 4 & 0x03)
+	tokenLength := uint8(b[0] & 0xF)
 
 	m.Code = b[1]
 
-	messageID := coding.DecodeUint16(b[2:])
-	m.MessageID = uint16(messageID)
+	m.MessageID = coding.DecodeUint16(b[2:])
 
 	b = make([]byte, tokenLength)
 	n, err = m.buff.Read(b)
@@ -231,7 +230,9 @@ func (m *Message) DecodeOptions() error {
 
 	// 0xFF is the payload indicator
 	for b != 0xFF {
-		delta := uint16(b & 0xF)
+
+		delta := uint16(b >> 4)
+		length := uint16(b & 0x0f)
 
 		// Taking into account extended options
 		switch delta {
@@ -248,8 +249,6 @@ func (m *Message) DecodeOptions() error {
 			}
 		}
 
-		// Getting the length
-		length := uint16(b >> 4)
 		switch length {
 		case 13:
 			length, err = m.OneByteOption()

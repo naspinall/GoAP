@@ -17,4 +17,6 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("%+v", m)
+
+	log.Println(string(m.Payload))
 }

@@ -13,8 +13,6 @@ func (c *Client) Get(URI string) (*messages.Message, error) {
 	}
 
 	m := messages.NewMessage(messages.Get(), messages.WithMessageID(messageID), messages.WithToken(token), messages.WithURI(URI))
-	log.Printf("%+v", m)
-	log.Printf("%+v", m.Options)
 	m, err = c.Do(m)
 	if err != nil {
 		log.Fatal(err)
